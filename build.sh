@@ -13,6 +13,9 @@ if [ ! -d "toolchain" ]; then
     git clone --depth=1 https://github.com/kdrag0n/proton-clang -b master toolchain
 fi
 
+#export clang
+export PATH=$PATH:"${RDIR}/toolchain/bin"
+
 #build dir
 if [ ! -d "${RDIR}/build" ]; then
     mkdir -p "${RDIR}/build"
