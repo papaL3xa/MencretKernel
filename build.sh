@@ -1,4 +1,6 @@
 #!/bin/bash
+set -x
+
 RDIR="$(pwd)"
 export KBUILD_BUILD_USER="@ravindu644"
 
