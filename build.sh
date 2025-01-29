@@ -23,6 +23,14 @@ else
     rm -rf "${RDIR}/build" && mkdir -p "${RDIR}/build"
 fi
 
+#kernelversion
+if [ -z "$BUILD_KERNEL_VERSION" ]; then
+    export BUILD_KERNEL_VERSION="dev"
+fi
+
+#setting up localversion
+echo -e "CONFIG_LOCALVERSION_AUTO=n\nCONFIG_LOCALVERSION=\"-ravindu644-${BUILD_KERNEL_VERSION}\"\n" > "${RDIR}/arch/arm64/configs/version.config"
+
 #path for binary files
 export dt_tool="$RDIR/binaries"
 export repacker="$dt_tool/AIK/repackimg.sh"
