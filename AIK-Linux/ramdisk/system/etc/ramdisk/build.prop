@@ -1,0 +1,22 @@
+####################################
+# from generate-common-build-props
+# These properties identify this partition image.
+####################################
+ro.product.bootimage.brand=samsung
+ro.product.bootimage.device=d1
+ro.product.bootimage.manufacturer=samsung
+ro.product.bootimage.model=SM-N970F
+ro.product.bootimage.name=d1xx
+ro.bootimage.build.date=Mon Jul 31 17:25:51 KST 2023
+ro.bootimage.build.date.utc=1690791951
+ro.bootimage.build.fingerprint=samsung/d1xx/d1:12/SP1A.210812.016/N970FXXS9HWG9:user/release-keys
+ro.bootimage.build.id=SP1A.210812.016
+ro.bootimage.build.tags=release-keys
+ro.bootimage.build.type=user
+ro.bootimage.build.version.incremental=N970FXXS9HWG9
+ro.bootimage.build.version.release=12
+ro.bootimage.build.version.release_or_codename=12
+ro.bootimage.build.version.sdk=31
+# Auto-added by post_process_props.py
+persist.sys.usb.config=mtp
+# end of file
