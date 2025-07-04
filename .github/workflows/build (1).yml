@@ -1,0 +1,403 @@
+name: Build a kernel with KernelSU patched and SuSFS
+on:
+    workflow_dispatch:
+        # Various inputs to simplify usage of workflow.
+        inputs:
+            KSU_GIT:
+                description: 'Link to KernelSU git repository (leave it be for KernelSU-Next or if unsure):'
+                required: false
+                default: 'https://github.com/KernelSU-Next/KernelSU-Next.git'
+            KSU_GIT_BRANCH:
+                description: 'Preferred branch of the preferred KernelSU git repository (leave it be for KernelSU-Next, otherwise must define):'
+                required: false
+                default: 'next'
+            INCLUDE_SUSFS:
+                type: boolean
+                description: 'Build with SuSFS (leave it be if unsure)?'
+                required: false
+                default: false
+            KERNEL_GIT:
+                description: 'Link to the git repository of your preferred kernel source:'
+                required: true
+            KERNEL_GIT_BRANCH:
+                description: 'Preferred branch of the kernel source git repository:'
+                required: true
+            KERNEL_ARCH:
+                type: choice
+                description: 'Kernel architecture (seperate from Android architecture):'
+                required: true
+                options:
+                    - 'arm64'
+                    - 'arm'
+            KERNEL_COMPILER:
+                type: choice
+                description: 'Compiler choice:'
+                required: true
+                options:
+                    - 'Clang/LLVM'
+                    - 'GCC/Binutils'
+                    - 'Clang/Binutils'
+                    - 'GCC/LLVM'
+            KERNEL_COMPILER_TOOLCHAIN:
+                description: 'Direct link to custom compiler prebuilt toolchain (leave blank if not required):'
+                required: false
+            KERNEL_COMPILER_PREFIX:
+                description: 'Path prefix for custom prebuilt toolchain (must define if custom toolchain, otherwise leave blank):'
+                required: false
+            KERNEL_CONFIGS:
+                description: 'Space-seperated list of kernel configs by order (!IMPORTANT AND DANGEROUS!):'
+                required: true
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+        - name: Checkout Repository
+          uses: actions/checkout@v4
+          with:
+           fetch-depth: 0
+
+        - name: 'Validate workflow options'
+          run: |
+            if
+                if git ls-remote ${{ github.event.inputs.KERNEL_GIT }} | grep -w "${{ github.event.inputs.KERNEL_GIT_BRANCH }}" > /dev/null; then
+                    echo "--- Kernel source git link and branch points to a valid git repo! ---"
+                elif git ls-remote ${{ github.event.inputs.KERNEL_GIT }} > /dev/null; then
+                    echo "--- Kernel source git link points to a valid git repo, but the branch specified is invalid, please specify the branch properly! ---"
+                    exit 1
+                else
+                    echo "--- Kernel source git link and branch points to an invalid git repo, please specify them properly! ---"
+                    exit 1
+                fi
+                if git ls-remote ${{ github.event.inputs.KSU_GIT }} | grep -w "${{ github.event.inputs.KSU_GIT_BRANCH }}" > /dev/null; then
+                    echo "--- KernelSU git link and branch points to a valid git repo! ---"
+                elif git ls-remote ${{ github.event.inputs.KSU_GIT }} > /dev/null; then
+                    echo "--- KernelSU git link points to a valid git repo, but the branch specified is invalid, please specify the branch properly! ---"
+                    exit 1
+                else
+                    echo "--- KernelSU git link and branch points to an invalid git repo, please specify them properly! ---"
+                    exit 1
+                fi
+
+                if [ ! -z ${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }} ]; then
+                    if curl -sIL "${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }}" | grep -i "content-disposition: attachment" > /dev/null || curl -sIL "${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }}" | grep -i "content-type: application/octet-stream" > /dev/null; then
+                        echo "--- Custom compiler prebuilt toolchain link is a valid direct download link ---"
+                    else
+                        echo "--- Custom compiler prebuilt toolchain link either isn't a direct download link or is invalid ---"
+                        exit 1
+                    fi
+                fi
+            then
+                echo "--- All link-related workflow options seem to be valid! ---"
+            fi
+
+        - name: 'Debloat the OS'
+          run: |
+            export DEBIAN_FRONTEND=noninteractive
+            echo "DEBIAN_FRONTEND=noninteractive" >> $GITHUB_ENV
+
+            echo "Storage spaces before debloat/clean-up:"
+            df -h
+
+            sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL /usr/local/share/powershell /usr/share/swift || true
+            sudo docker image prune --all --force
+            echo "some directories deleted"
+
+            # Remove large unwanted packages
+            sudo apt-get purge -y \
+                aria2 ansible azure-cli shellcheck rpm xorriso zsync \
+                esl-erlang firefox gfortran-8 gfortran-9 google-chrome-stable \
+                google-cloud-sdk imagemagick \
+                libmagickcore-dev libmagickwand-dev libmagic-dev ant ant-optional kubectl \
+                mercurial apt-transport-https mono-complete libmysqlclient \
+                unixodbc-dev yarn chrpath libssl-dev libxft-dev \
+                libfreetype6 libfreetype6-dev libfontconfig1 libfontconfig1-dev \
+                snmp pollinate libpq-dev postgresql-client powershell ruby-full \
+                sphinxsearch subversion mongodb-org microsoft-edge-stable || true
+
+            # Regex-based purges (for bulk families like mysql, php, dotnet)
+            sudo apt-get purge -y $(dpkg-query -W -f='${binary:Package}\n' | grep -E '^mysql|^php|^dotnet') || true
+
+            # Clean up
+            sudo apt-get autoremove -y
+            sudo apt-get autoclean -y
+            echo "some packages purged"
+
+            echo "Storage spaces after debloat/clean-up:"
+            df -h
+
+        - name: 'Setup dependencies and environment'
+          run: |
+            # Setup package sources and apt
+            sudo cp /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources~
+            sudo sed -Ei 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+            sudo apt-get update -y
+
+            # Install kernel build dependencies
+            sudo apt build-dep -y linux
+
+            # Install clang and LLVM
+            LATEST_LLVM_TOOLCHAIN=$(curl -sSf https://api.github.com/repos/llvm/llvm-project/releases/latest | grep browser_download_url | cut -d '"' -f 4 | grep -wi "Linux-X64.tar.xz"$)
+            wget $LATEST_LLVM_TOOLCHAIN -O ./LLVM-latest-Linux-X64.tar.xz
+            tar --wildcards -xvpf ./LLVM-latest-Linux-X64.tar.xz --warning=no-file-changed --ignore-failed-read || true
+            rm -rf *.tar.xz
+
+            # Install GCC for aarch64 and arm(32)
+            wget https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-arm-none-linux-gnueabihf.tar.xz https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz
+            for file in *.tar.xz; do tar --wildcards -xvpf $file --warning=no-file-changed --ignore-failed-read || true; done
+            rm -rf *.tar.xz
+
+            # Install some general dependencies
+            sudo apt-get install -y p7zip-full tar bzip2 unrar gzip zip unzip python3-dev repo
+
+            # Download and extract compiler toolchain
+            extract ()
+            {
+            if [ -f $1 ] ; then
+                case $1 in
+                *.tar.bz2)   tar xjf $1   ;;
+                *.tar.gz)    tar xzf $1   ;;
+                *.bz2)       bunzip2 $1   ;;
+                *.rar)       unrar x $1   ;;
+                *.gz)        gunzip $1    ;;
+                *.tar)       tar xf $1    ;;
+                *.tbz2)      tar xjf $1   ;;
+                *.tgz)       tar xzf $1   ;;
+                *.zip)       unzip $1     ;;
+                *.Z)         uncompress $1;;
+                *.7z)        7z x $1      ;;
+                *.deb)       ar x $1      ;;
+                *.tar.xz)    tar xf $1    ;;
+                *)           echo "'$1' cannot be extracted via extract()" ;;
+                esac
+            else
+                echo "'$1' is not a valid file"
+            fi
+            }
+
+            if [ ! -z ${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }} ]; then
+                mkdir ./compiler-toolchain/
+                wget ${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }} -P ./compiler-toolchain/
+
+                cd ./compiler-toolchain/
+                extract ./*
+                cd ../
+            fi
+
+            # Compile and install coccinelle
+            sudo apt-get build-dep -y coccinelle
+            git clone --depth=1 https://github.com/coccinelle/coccinelle.git
+            cd ./coccinelle/
+            ./autogen
+            ./configure
+            make -j$(nproc --all)
+            sudo make -j$(nproc --all) install
+
+        - name: 'Clone kernel source'
+          run: |
+            rm -rf ./kernel-src*/
+            mkdir ./kernel-src-clone/
+            cd ./kernel-src-clone/
+
+            if git ls-remote ${{ github.event.inputs.KERNEL_GIT }} | grep -w "${{ github.event.inputs.KERNEL_GIT_BRANCH }}" > /dev/null; then
+                echo "--- Kernel source git link and branch points to a valid git repo! ---"
+                if repo init --no-repo-verify --git-lfs --depth=1 -u ${{ github.event.inputs.KERNEL_GIT }} -b ${{ github.event.inputs.KERNEL_GIT_BRANCH }}; then
+                    echo "--- Syncing via repo ---"
+                    repo sync -c --no-clone-bundle --no-tags --optimized-fetch --prune --force-sync -j$(nproc --all)
+                    echo "--- Syncing finished ---"
+                    cd ..
+                    ln -sf $(find ./kernel-src-clone/ -maxdepth 2 -type d -name "common" | head -n 1) ./kernel-src
+                else
+                    echo "--- Cloning via git ---"
+                    rm -rf ./.repo/
+                    cd ..
+                    git clone --depth=1 ${{ github.event.inputs.KERNEL_GIT }} -b ${{ github.event.inputs.KERNEL_GIT_BRANCH }} ./kernel-src-clone/
+                    echo "--- Cloning finished ---"
+                    ln -sf ./kernel-src-clone ./kernel-src
+                fi
+            elif git ls-remote ${{ github.event.inputs.KERNEL_GIT }} > /dev/null; then
+                echo "--- Kernel source git link points to a valid git repo, but the branch specified is invalid, please specify the branch properly! ---"
+                exit 1
+            else
+                echo "--- Kernel source git link and branch points to an invalid git repo, please specify them properly! ---"
+                exit 1
+            fi
+
+        - name: 'Clone any submodules if present'
+          working-directory: './kernel-src'
+          run: |
+            git submodule init; git submodule update
+
+        - name: 'Patch KernelSU repository into the kernel source'
+          working-directory: './kernel-src'
+          run: |
+            # Revert any old KernelSU patches
+            [ -L "drivers/kernelsu" ] && rm "drivers/kernelsu" && echo "[-] Symlink removed."
+            grep -q "kernelsu" "./drivers/Makefile" && sed -i '/kernelsu/d' "./drivers/Makefile" && echo "[-] Makefile reverted."
+            grep -q "drivers/kernelsu/Kconfig" "./drivers/Kconfig" && sed -i '/drivers\/kernelsu\/Kconfig/d' "./drivers/Kconfig" && echo "[-] Kconfig reverted."
+            if [ -d "./KernelSU*" ]; then
+                rm -rf "./KernelSU*" && echo "[-] KernelSU directory deleted."
+            fi
+
+            # Clone the KernelSU repository
+            if git ls-remote ${{ github.event.inputs.KSU_GIT }} | grep -w "${{ github.event.inputs.KSU_GIT_BRANCH }}" > /dev/null; then
+                echo "--- KernelSU git link and branch points to a valid git repo! ---"
+            	git clone ${{ github.event.inputs.KSU_GIT }} -b ${{ github.event.inputs.KSU_GIT_BRANCH }} ./KernelSU
+            elif git ls-remote ${{ github.event.inputs.KSU_GIT }} > /dev/null; then
+                echo "--- KernelSU git link points to a valid git repo, but the branch specified is invalid, please specify the branch properly! ---"
+                exit 1
+            else
+                echo "--- KernelSU git link and branch points to an invalid git repo, please specify them properly! ---"
+                exit 1
+            fi
+
+            # Apply KernelSU patches
+            ln -sf ../KernelSU/kernel ./drivers/kernelsu
+            grep -q "kernelsu" "./drivers/Makefile" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "./drivers/Makefile" && echo "[+] Modified Makefile."
+            grep -q "source \"drivers/kernelsu/Kconfig\"" "./drivers/Kconfig" || sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "./drivers/Kconfig" && echo "[+] Modified Kconfig."
+            echo '[+] Done.'
+
+        - name: 'Patch KernelSU manual scope-minimized hooks into the kernel source'
+          working-directory: './kernel-src'
+          run: |
+            # Clone the repository which contains the patch
+            git clone --depth=1 https://github.com/devnoname120/kernelsu-coccinelle.git
+
+            # Patch the kernel source with scope-minimized hooks
+            for p in fs drivers/input drivers/tty arch/arm/kernel; do spatch --sp-file ./kernelsu-coccinelle/scope-minimized-hooks/kernelsu-scope-minimized.cocci --in-place --linux-spacing "$p"; done
+
+            # Cleanup
+            rm -rf ./kernelsu-coccinelle/
+
+            # Delete files that may conflict with kernel functionality
+            rm -rf ./android/abi_gki_protected_exports*
+
+        - name: 'Generate the kernel .config file'
+          working-directory: './kernel-src'
+          run: |
+            shopt -s globstar
+
+            # Generate kernel config using make
+            if [ ${{ github.event.inputs.KERNEL_COMPILER }} == 'Clang/LLVM' ]; then
+                if [ ! -z ${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }} ]; then
+                    make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang LD=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}ld.lld AR=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-ar NM=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-nm STRIP=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-strip OBJCOPY=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-objcopy OBJDUMP=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-objdump OBJSIZE=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-size READELF=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-readelf HOSTCC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang HOSTCXX=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang++ HOSTAR=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-ar HOSTLD=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}ld.lld -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                else
+                    make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang LD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld AR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar NM=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-nm STRIP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-strip OBJCOPY=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objcopy OBJDUMP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objdump OBJSIZE=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-size READELF=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-readelf HOSTCC=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang HOSTCXX=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang++ HOSTAR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar HOSTLD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                fi
+            fi
+
+            if [ ${{ github.event.inputs.KERNEL_COMPILER }} == 'GCC/Binutils' ]; then
+                if [ ! -z ${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }} ]; then
+                    make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}gcc CROSS_COMPILE=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }} -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                else
+                    if [ ${{ github.event.inputs.KERNEL_ARCH }} == 'arm' ]; then
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf-gcc CROSS_COMPILE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf- -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                    else
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu-gcc CROSS_COMPILE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu- -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                    fi
+                fi
+            fi
+
+            if [ ${{ github.event.inputs.KERNEL_COMPILER }} == 'Clang/Binutils' ]; then
+                if [ ! -z ${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }} ]; then
+                    if [ ${{ github.event.inputs.KERNEL_ARCH }} == 'arm' ]; then
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang CLANG_TRIPLE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf- CROSS_COMPILE=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }} -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                    else
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang CLANG_TRIPLE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu- CROSS_COMPILE=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }} -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                    fi
+                else
+                    if [ ${{ github.event.inputs.KERNEL_ARCH }} == 'arm' ]; then
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=clang CLANG_TRIPLE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf- CROSS_COMPILE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf- -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                    else
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=clang CLANG_TRIPLE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu- CROSS_COMPILE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu- -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                    fi
+                fi
+            fi
+
+            if [ ${{ github.event.inputs.KERNEL_COMPILER }} == 'GCC/LLVM' ]; then
+                if [ ! -z ${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }} ]; then
+                    make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}gcc LD=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}ld.lld AR=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-ar NM=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-nm STRIP=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-strip OBJCOPY=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-objcopy OBJDUMP=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-objdump OBJSIZE=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-size READELF=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-readelf HOSTCC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang HOSTCXX=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang++ HOSTAR=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-ar HOSTLD=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}ld.lld -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                else
+                    if [ ${{ github.event.inputs.KERNEL_ARCH }} == 'arm' ]; then
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf-gcc LD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld AR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar NM=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-nm STRIP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-strip OBJCOPY=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objcopy OBJDUMP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objdump OBJSIZE=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-size READELF=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-readelf HOSTCC=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang HOSTCXX=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang++ HOSTAR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar HOSTLD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                    else
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu-gcc LD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld AR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar NM=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-nm STRIP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-strip OBJCOPY=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objcopy OBJDUMP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objdump OBJSIZE=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-size READELF=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-readelf HOSTCC=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang HOSTCXX=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang++ HOSTAR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar HOSTLD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld -j$(nproc --all) O=out ${{ github.event.inputs.KERNEL_CONFIGS }}
+                    fi
+                fi
+            fi
+
+            ./scripts/config --disable LOCALVERSION_AUTO --file out/.config
+            sed -i '/res="$res${scm:++}"/d' scripts/setlocalversion
+            echo 'CONFIG_KSU_KPROBES_HOOK=n' >> out/.config
+
+            if [ $(./scripts/config --state LTO_CLANG_FULL --file out/.config) == 'y' ]; then
+                ./scripts/config --disable LTO_CLANG_FULL --file out/.config
+                ./scripts/config --enable LTO_CLANG_THIN --file out/.config
+            fi
+
+        - name: 'Build kernel'
+          working-directory: './kernel-src'
+          run: |
+            shopt -s globstar
+
+            # Compile using make
+            if [ ${{ github.event.inputs.KERNEL_COMPILER }} == 'Clang/LLVM' ]; then
+                if [ ! -z ${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }} ]; then
+                    make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang LD=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}ld.lld AR=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-ar NM=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-nm STRIP=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-strip OBJCOPY=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-objcopy OBJDUMP=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-objdump OBJSIZE=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-size READELF=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-readelf HOSTCC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang HOSTCXX=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang++ HOSTAR=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-ar HOSTLD=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}ld.lld -j$(nproc --all) O=out
+                else
+                    make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang LD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld AR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar NM=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-nm STRIP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-strip OBJCOPY=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objcopy OBJDUMP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objdump OBJSIZE=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-size READELF=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-readelf HOSTCC=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang HOSTCXX=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang++ HOSTAR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar HOSTLD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld -j$(nproc --all) O=out
+                fi
+            fi
+
+            if [ ${{ github.event.inputs.KERNEL_COMPILER }} == 'GCC/Binutils' ]; then
+                if [ ! -z ${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }} ]; then
+                    make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}gcc CROSS_COMPILE=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }} -j$(nproc --all) O=out
+                else
+                    if [ ${{ github.event.inputs.KERNEL_ARCH }} == 'arm' ]; then
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf-gcc CROSS_COMPILE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf- -j$(nproc --all) O=out
+                    else
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu-gcc CROSS_COMPILE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu- -j$(nproc --all) O=out
+                    fi
+                fi
+            fi
+
+            if [ ${{ github.event.inputs.KERNEL_COMPILER }} == 'Clang/Binutils' ]; then
+                if [ ! -z ${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }} ]; then
+                    if [ ${{ github.event.inputs.KERNEL_ARCH }} == 'arm' ]; then
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang CLANG_TRIPLE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf- CROSS_COMPILE=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }} -j$(nproc --all) O=out
+                    else
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang CLANG_TRIPLE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu- CROSS_COMPILE=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }} -j$(nproc --all) O=out
+                    fi
+                else
+                    if [ ${{ github.event.inputs.KERNEL_ARCH }} == 'arm' ]; then
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=clang CLANG_TRIPLE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf- CROSS_COMPILE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf- -j$(nproc --all) O=out
+                    else
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=clang CLANG_TRIPLE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu- CROSS_COMPILE=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu- -j$(nproc --all) O=out
+                    fi
+                fi
+            fi
+
+            if [ ${{ github.event.inputs.KERNEL_COMPILER }} == 'GCC/LLVM' ]; then
+                if [ ! -z ${{ github.event.inputs.KERNEL_COMPILER_TOOLCHAIN }} ]; then
+                    make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}gcc LD=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}ld.lld AR=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-ar NM=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-nm STRIP=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-strip OBJCOPY=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-objcopy OBJDUMP=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-objdump OBJSIZE=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-size READELF=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-readelf HOSTCC=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang HOSTCXX=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}clang++ HOSTAR=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}llvm-ar HOSTLD=$(realpath ~/**/compiler-toolchain)/${{ github.event.inputs.KERNEL_COMPILER_PREFIX }}ld.lld -j$(nproc --all) O=out
+                else
+                    if [ ${{ github.event.inputs.KERNEL_ARCH }} == 'arm' ]; then
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-arm-none-linux-gnu*/bin)/arm-none-linux-gnueabihf-gcc LD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld AR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar NM=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-nm STRIP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-strip OBJCOPY=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objcopy OBJDUMP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objdump OBJSIZE=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-size READELF=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-readelf HOSTCC=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang HOSTCXX=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang++ HOSTAR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar HOSTLD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld -j$(nproc --all) O=out
+                    else
+                        make ARCH=${{ github.event.inputs.KERNEL_ARCH }} CC=$(realpath ~/**/arm-gnu-toolchain-*-x86_64-aarch64-none-linux-gnu*/bin)/aarch64-none-linux-gnu-gcc LD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld AR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar NM=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-nm STRIP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-strip OBJCOPY=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objcopy OBJDUMP=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-objdump OBJSIZE=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-size READELF=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-readelf HOSTCC=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang HOSTCXX=$(realpath ~/**/LLVM-*-Linux-X64/bin)/clang++ HOSTAR=$(realpath ~/**/LLVM-*-Linux-X64/bin)/llvm-ar HOSTLD=$(realpath ~/**/LLVM-*-Linux-X64/bin)/ld.lld -j$(nproc --all) O=out
+                    fi
+                fi
+            fi
+
+        - name: 'Organize boot artifacts'
+          working-directory: './kernel-src'
+          run: |
+            # Copy all boot-related build artifacts into a seperate folder
+            mkdir -p ../kernel-build-artifacts-${{ github.event.inputs.KERNEL_ARCH }}-$(date +"%Y%m%d")/
+            cp -rf out/arch/${{ github.event.inputs.KERNEL_ARCH }}/boot/* ../kernel-build-artifacts*/
+
+        - name: 'Upload kernel build artifacts'
+          uses: actions/upload-artifact@v4
+          with:
+            name: kernel-build-artifacts
+            path: ./kernel-build-artifacts*/
