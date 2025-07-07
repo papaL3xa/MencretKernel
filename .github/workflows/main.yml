@@ -1,0 +1,46 @@
+name: build test
+
+on:
+  workflow_dispatch:
+    inputs:      
+      tag:
+        description: 'Release Tag'
+        required: true        
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        device: [d1]
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up build environment
+        run: |
+          sudo apt update -y  
+          sudo apt install libncurses5-dev -y
+          wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb && sudo dpkg -i libtinfo5_6.3-2ubuntu0.1_amd64.deb         
+          
+      - name: Set environment variable
+        run: |
+          echo "BUILD_KERNEL_VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          
+      - name: Building Kernel
+        run: |
+            bash build.sh ${{ matrix.device }}
+
+      - name: Upload kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: "KernelSU-Next-${{ env.BUILD_KERNEL_VERSION }}-${{ matrix.device }}-stock-One-UI"
+          path: |
+            build/*.tar
+
+  
