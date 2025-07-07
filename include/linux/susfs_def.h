@@ -1,7 +1,7 @@
 #ifndef KSU_SUSFS_DEF_H
 #define KSU_SUSFS_DEF_H
 
-#include <linux/bitops.h>
+#include <linux/bits.h>
 
 /********/
 /* ENUM */
