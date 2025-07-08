@@ -1,8 +1,9 @@
 <h1>### **How to Install**</h1>
 
-Flash kernel .tar file via ODIN.
-Install KernelSU Next from [Here](https://github.com/KernelSU-Next/KernelSU-Next/releases)
-Install susfs4ksu module from [Here](https://github.com/sidex15/susfs4ksu-module/releases)
+1. Flash kernel .tar file via ODIN.
+2. Reboot your device
+3. Install KernelSU Next from [Here](https://github.com/KernelSU-Next/KernelSU-Next/releases)
+4. Install susfs4ksu module from [Here](https://github.com/sidex15/susfs4ksu-module/releases)
 
 +++++++++++++++++++++
 
