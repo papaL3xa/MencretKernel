@@ -1,5 +1,6 @@
 <div align="center">
 <h1> MencretKernel made for Galaxy S10/Note10 devices.</h1>
+</div>
 
 <h1>Features</h1>
 -  Kernel Based on Samsung Stock KernelOneUI 3/4 and Binaries 7, 8 and 9 Support (It may have some issues depending on ROM binary or OneUI version
@@ -18,6 +19,7 @@
 - [VN-ROM](https://t.me/vnromchannel/394)
 - And more... (It should work if your ROM is based on stock ROM)
 - 
+
 <h1>How to Install</h1>
 
 1. Flash kernel .tar file via ODIN.
@@ -25,6 +27,7 @@
 3. Install KernelSU Next from [Here](https://github.com/KernelSU-Next/KernelSU-Next/releases)
 4. Install susfs4ksu module from [Here](https://github.com/sidex15/susfs4ksu-module/releases)
 
+<div align="center">
 # Supported Devices:
 
 |        Name       |  Codename  |    Model   |
@@ -37,6 +40,7 @@
 |  Galaxy Note10 5G |    d1xks   |  SM-N971N  |
 |   Galaxy Note10+  |     d2s    | SM-N975F/N |
 | Galaxy Note10+ 5G |     d2x    | SM-N976B/N |
+</div>
 
 # Credits
 
@@ -45,4 +49,4 @@
 - [`Ravindu644`](https://github.com/ravindu644) for [Kernel Source](https://github.com/ravindu644/samsung_exynos9820_stock)
 - [`StardustMod`](https://github.com/StardustMod) for [Inspirations](https://github.com/StardustMod/android_kernel_samsung_exynos9820)
 
-</div>
+
