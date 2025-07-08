@@ -1,4 +1,5 @@
-<h1> align="center">MencretKernel made for Galaxy S10/Note10 devices.</h1>
+<align="center">
+<h1> MencretKernel made for Galaxy S10/Note10 devices.</h1>
 
 <h1>Features</h1>
 -  Kernel Based on Samsung Stock KernelOneUI 3/4 and Binaries 7, 8 and 9 Support (It may have some issues depending on ROM binary or OneUI version
@@ -43,3 +44,5 @@
 - [`simonpunk`](https://github.com/simonpunk) for [susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu)
 - [`Ravindu644`](https://github.com/ravindu644) for [Kernel Source](https://github.com/ravindu644/samsung_exynos9820_stock)
 - [`StardustMod`](https://github.com/StardustMod) for [Inspirations](https://github.com/StardustMod/android_kernel_samsung_exynos9820)
+
+  </align="center">
