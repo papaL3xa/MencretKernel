@@ -1,10 +1,10 @@
 <div align="center">
-<h1> MencretKernel made for Galaxy S10/Note10 devices.</h1>
+<h1> MencretKernel 💦 made for Galaxy S10/Note10 devices.</h1>
 </div>
 
-<h1>Features</h1>
+<div align="center"><h1>Features</h1></div>
 
-<div align="center">- Kernel Based on Samsung Stock KernelOneUI 3/4 and Binaries 7, 8 and 9 Support (It may have some issues depending on ROM binary or OneUI version
+- Kernel Based on Samsung Stock KernelOneUI 3/4 and Binaries 7, 8 and 9 Support (It may have some issues depending on ROM binary or OneUI version
 - KernelSU Next v1.0.8
 - SUSFS ඞ v1.5.9
 - CPU Input Boost
@@ -13,7 +13,7 @@
 - Soon..  
 </div>
 
-<h1>Tested On</h1>
+<div align="center"><h1>Tested On</h1></div>
 
 - [Stock ROM]
 - [Dr.Ketan ROM](https://xdaforums.com/t/31-07-24-i-n975f-i-n976b-i-n976n-i-n970f-i-dr-ketan-rom-i-oneui-4-1-i-oneui-3-1.3962839)
@@ -22,7 +22,7 @@
 - And more... (It should work if your ROM is based on stock ROM)
 - 
 
-<h1>How to Install</h1>
+<div align="center"><h1>How to Install</h1></div>
 
 1. Flash kernel .tar file via ODIN.
 2. Reboot your device
@@ -31,7 +31,7 @@
 
 <div align="center">
 
- <h1>Supported Devices:</h1>
+<h1>Supported Devices:</h1>
 
 |        Name       |  Codename  |    Model   |
 :------------------:|:----------:|:----------:|
@@ -45,7 +45,7 @@
 | Galaxy Note10+ 5G |     d2x    | SM-N976B/N |
 </div>
 
-# Credits
+<div align="center"><h1>Credits</h1></div>
 
 - [`rifsxd`](https://github.com/rifsxd) for [KernelSU Next](https://github.com/KernelSU-Next/KernelSU-Next)
 - [`simonpunk`](https://github.com/simonpunk) for [susfs4ksu](https://gitlab.com/simonpunk/susfs4ksu)
