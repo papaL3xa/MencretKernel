@@ -79,7 +79,7 @@ fi
 
 #building function
 build_ksu(){
-    make ${ARGS} "${KERNEL_DEFCONFIG}" common.config ksu.config version.config
+    make ${ARGS} "${KERNEL_DEFCONFIG}" common.config ksu.config version.config mencret.config
     make ${ARGS} menuconfig || true
     make ${ARGS} || exit 1
 }
