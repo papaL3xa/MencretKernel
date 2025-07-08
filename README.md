@@ -2,16 +2,16 @@
 <h1> MencretKernel made for Galaxy S10/Note10 devices.</h1>
 </div>
 
-#<h1>Features</h1>
+<h1>Features</h1>
 
-- Kernel Based on Samsung Stock KernelOneUI 3/4 and Binaries 7, 8 and 9 Support (It may have some issues depending on ROM binary or OneUI version
+<div align="center">- Kernel Based on Samsung Stock KernelOneUI 3/4 and Binaries 7, 8 and 9 Support (It may have some issues depending on ROM binary or OneUI version
 - KernelSU Next v1.0.8
 - SUSFS ඞ v1.5.9
 - CPU Input Boost
 - Voltage Control
 - Fingerprint Boost
 - Soon..  
- 
+</div>
 
 <h1>Tested On</h1>
 
