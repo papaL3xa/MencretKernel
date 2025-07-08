@@ -3,17 +3,17 @@
 </div>
 
 <h1>Features</h1>
--  Kernel Based on Samsung Stock KernelOneUI 3/4 and Binaries 7, 8 and 9 Support (It may have some issues depending on ROM binary or OneUI version
--  KernelSU Next v1.0.8
--  SUSFS ඞ v1.5.9
--  CPU Input Boost
--  Voltage Control
--  Fingerprint Boost
--  Soon..  
+- Kernel Based on Samsung Stock KernelOneUI 3/4 and Binaries 7, 8 and 9 Support (It may have some issues depending on ROM binary or OneUI version
+- KernelSU Next v1.0.8
+- SUSFS ඞ v1.5.9
+- CPU Input Boost
+- Voltage Control
+- Fingerprint Boost
+- Soon..  
 
 # Tested On
 
-- Stock ROM 
+- [Stock ROM]
 - [Dr.Ketan ROM](https://xdaforums.com/t/31-07-24-i-n975f-i-n976b-i-n976n-i-n970f-i-dr-ketan-rom-i-oneui-4-1-i-oneui-3-1.3962839)
 - [HyperROM](https://xdaforums.com/t/rom-n10-n10plus-n105g-14-jan-23-v1-1s-hyper-rom-be-unique.4268123)
 - [VN-ROM](https://t.me/vnromchannel/394)
