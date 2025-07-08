@@ -1,4 +1,14 @@
-<h1>### **How to Install**</h1>
+|<h1>Features</h1>
+* Kernel Based on Samsung Stock Kernel
+* OneUI 3/4 and Binaries 7, 8 and 9 Support (It may have some issues depending on ROM binary or OneUI version)
+* KernelSU Next v1.0.8
+* SUSFS ඞ v1.5.9
+* CPU Input Boost
+* Voltage Control
+* Fingerprint Boost
+|
+
+<h1>How to Install</h1>
 
 1. Flash kernel .tar file via ODIN.
 2. Reboot your device
@@ -6,22 +16,3 @@
 4. Install susfs4ksu module from [Here](https://github.com/sidex15/susfs4ksu-module/releases)
 
 +++++++++++++++++++++
-
-Linux kernel
-============
-
-This file was moved to Documentation/admin-guide/README.rst
-
-Please notice that there are several guides for kernel developers and users.
-These guides can be rendered in a number of formats, like HTML and PDF.
-
-In order to build the documentation, use ``make htmldocs`` or
-``make pdfdocs``.
-
-There are various text files in the Documentation/ subdirectory,
-several of them using the Restructured Text markup notation.
-See Documentation/00-INDEX for a list of what is contained in each file.
-
-Please read the Documentation/process/changes.rst file, as it contains the
-requirements for building and running the kernel, and information about
-the problems which may result by upgrading your kernel.
