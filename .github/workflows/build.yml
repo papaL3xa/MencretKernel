@@ -26,22 +26,24 @@ jobs:
         run: |
           sudo apt update -y  
           sudo apt install libncurses5-dev -y
-          wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb && sudo dpkg -i libtinfo5_6.3-2ubuntu0.1_amd64.deb         
+          wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb && sudo dpkg -i libtinfo5_6.3-2ubuntu0.1_amd64.deb
+          git clone --depth=1 https://github.com/ravindu644/proton-12.git -b main --single-branch proton
+          export PATH=$PWD/proton/bin:$PATH && sudo dpkg -i libtinfo5_6.3-2ubuntu0.1_amd64.deb         
           
       - name: Set environment variable
         run: |
           echo "BUILD_KERNEL_VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
           
-      - name: Building Kernel
+      - name: Building MencretKernel
         run: |
             bash build.sh ${{ matrix.device }}
 
       - name: Upload kernel
         uses: actions/upload-artifact@v4
         with:
-          name: "KernelSU-Next-${{ env.BUILD_KERNEL_VERSION }}-${{ matrix.device }}-stock-One-UI"
+          name: "MencretKernel-${{ env.BUILD_KERNEL_VERSION }}-${{ matrix.device }}-stock-One-UI"
           path: |
-            build/*.tar
+            build/*.zip
 
   release:
     needs: build
@@ -59,9 +61,9 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ github.event.inputs.tag }}
-          name: "KernelSU-Next-beyond-stock-One-UI-${{ github.event.inputs.tag }}"
+          name: "MencretKernel-stock-One-UI-${{ github.event.inputs.tag }}"
           draft: false
           prerelease: false
           token: ${{ secrets.TOKEN }}          
-          artifacts: "artifacts/**/*.tar"
+          artifacts: "artifacts/**/*.zip"
           body: "Commit SHA: ${{ github.sha }}"
