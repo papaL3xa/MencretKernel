@@ -2,7 +2,8 @@
 <h1> MencretKernel made for Galaxy S10/Note10 devices.</h1>
 </div>
 
-<h1>Features</h1>
+#<h1>Features</h1>
+
 - Kernel Based on Samsung Stock KernelOneUI 3/4 and Binaries 7, 8 and 9 Support (It may have some issues depending on ROM binary or OneUI version
 - KernelSU Next v1.0.8
 - SUSFS ඞ v1.5.9
@@ -12,7 +13,7 @@
 - Soon..  
  
 
-# Tested On
+<h1>Tested On</h1>
 
 - [Stock ROM]
 - [Dr.Ketan ROM](https://xdaforums.com/t/31-07-24-i-n975f-i-n976b-i-n976n-i-n970f-i-dr-ketan-rom-i-oneui-4-1-i-oneui-3-1.3962839)
@@ -29,7 +30,8 @@
 4. Install susfs4ksu module from [Here](https://github.com/sidex15/susfs4ksu-module/releases)
 
 <div align="center">
-# Supported Devices:
+
+ <h1>Supported Devices:</h1>
 
 |        Name       |  Codename  |    Model   |
 :------------------:|:----------:|:----------:|
