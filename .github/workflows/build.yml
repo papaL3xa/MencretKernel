@@ -32,38 +32,17 @@ jobs:
           
       - name: Set environment variable
         run: |
-          echo "BUILD_KERNEL_VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          SHA=$(git rev-parse --short ${{ github.sha }})
+          echo BUILD_DATE=$(date +'%Y%m%d') >> $GITHUB_ENV
+          echo BUILD_KERNEL_VERSION=CI-${{ github.event.inputs.version }}-$SHA >> $GITHUB_ENV
           
-      - name: Building MencretKernel
+      - name: Building Kernel
         run: |
-            bash build.sh ${{ matrix.device }}
+            bash build.sh -m ${{ matrix.device }} -v ${{ env.BUILD_KERNEL_VERSION }} -l ${{ github.event.inputs.llvm }} -r n
 
       - name: Upload kernel
         uses: actions/upload-artifact@v4
         with:
           name: "MencretKernel-${{ env.BUILD_KERNEL_VERSION }}-${{ matrix.device }}-stock-One-UI"
-          path: |
-            build/*.zip
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Create release
-        uses: ncipollo/release-action@v1
-        with:
-          tag: ${{ github.event.inputs.tag }}
-          name: "MencretKernel-stock-One-UI-${{ github.event.inputs.tag }}"
-          draft: false
-          prerelease: false
-          token: ${{ secrets.TOKEN }}          
-          artifacts: "artifacts/**/*.zip"
-          body: "Commit SHA: ${{ github.sha }}"
+          path: "build/out/${{ matrix.device }}/zip/*"
+          if-no-files-found: error
