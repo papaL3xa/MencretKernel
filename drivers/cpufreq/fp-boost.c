@@ -28,10 +28,8 @@
 
 #include <linux/cpu.h>
 #include <linux/cpufreq.h>
-#include <linux/state_notifier.h>
 #include <linux/input.h>
 #include <linux/slab.h>
-#include <linux/time.h>
 
 /* Available bits for boost_policy state */
 #define DRIVER_ENABLED        (1U << 0)
@@ -41,7 +39,7 @@
 #define FINGERPRINT_KEY 0x2ee
 
 /* The duration in milliseconds for the fingerprint boost */
-#define FP_BOOST_MS (1250)
+#define FP_BOOST_MS (2000)
 
 /*
  * "fp_config" = "fingerprint boost configuration". This contains the data and
@@ -67,9 +65,6 @@ struct boost_policy {
 	struct workqueue_struct *wq;
 	uint32_t state;
 };
-
-/* Using time stamp to avoid unnecessory boost */
-struct timeval prev_timeval;
 
 /* Global pointer to all of the data for the driver */
 static struct boost_policy *boost_policy_g;
@@ -114,9 +109,6 @@ static int do_cpu_boost(struct notifier_block *nb,
 	struct cpufreq_policy *policy = data;
 	struct boost_policy *b = boost_policy_g;
 	uint32_t state;
-	struct timeval curr_timeval;
-
-	do_gettimeofday(&curr_timeval);
 
 	if (action != CPUFREQ_ADJUST)
 		return NOTIFY_OK;
@@ -133,17 +125,12 @@ static int do_cpu_boost(struct notifier_block *nb,
 
 	/* Boost CPU to max frequency for fingerprint boost */
 	if (state & FINGERPRINT_BOOST) {
-		if (curr_timeval.tv_sec>prev_timeval.tv_sec) {
-			prev_timeval.tv_sec = curr_timeval.tv_sec;
-			pr_info("Boosting\n");
-			policy->cur = policy->max;
-			policy->min = policy->max;
-			return NOTIFY_OK;
-
-		} else {
-			pr_info("Boost avoided!\n");
-		}
+		pr_info("Boosting\n");
+		policy->cur = policy->max;
+		policy->min = policy->max;
+		return NOTIFY_OK;
 	}
+
 	return NOTIFY_OK;
 }
 
@@ -158,9 +145,6 @@ static void cpu_fp_input_event(struct input_handle *handle, unsigned int type,
 	struct boost_policy *b = boost_policy_g;
 	struct fp_config *fp = &b->fp;
 	uint32_t state;
-
-	if (!state_suspended)
-		return;
 
 	state = get_boost_state(b);
 
@@ -352,7 +336,7 @@ static struct boost_policy *alloc_boost_policy(void)
 	if (!b)
 		return NULL;
 
-	b->wq = alloc_workqueue("cpu_fp_wq", WQ_HIGHPRI | WQ_UNBOUND, 0);
+	b->wq = alloc_workqueue("cpu_fp_wq", WQ_HIGHPRI, 0);
 	if (!b->wq) {
 		pr_err("Failed to allocate workqueue\n");
 		goto free_b;
@@ -370,11 +354,6 @@ static int __init cpu_fp_init(void)
 	struct boost_policy *b;
 	int ret;
 	touched = false;
-
-	do_gettimeofday(&prev_timeval);
-
-	/* To allow first boost */
-	prev_timeval.tv_sec -= 2;
 
 	b = alloc_boost_policy();
 	if (!b) {
