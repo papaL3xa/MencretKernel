@@ -10,6 +10,7 @@
 - Voltage Control
 - Fingerprint Boost
 - Soon..  
+ 
 
 # Tested On
 
