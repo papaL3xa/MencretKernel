@@ -1,4 +1,4 @@
-<h4 align="center">MencretKernel made for Galaxy S10/Note10 devices.</h4>
+<h1> align="center">MencretKernel made for Galaxy S10/Note10 devices.</h1>
 
 <h1>Features</h1>
 -  Kernel Based on Samsung Stock KernelOneUI 3/4 and Binaries 7, 8 and 9 Support (It may have some issues depending on ROM binary or OneUI version
