@@ -1,3 +1,11 @@
+<h1>### **How to Install**</h1>
+
+Flash kernel .tar file via ODIN.
+Install KernelSU Next from [Here](https://github.com/KernelSU-Next/KernelSU-Next/releases)
+Install susfs4ksu module from [Here](https://github.com/sidex15/susfs4ksu-module/releases)
+
++++++++++++++++++++++
+
 Linux kernel
 ============
 
