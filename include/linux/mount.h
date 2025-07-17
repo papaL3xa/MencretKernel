@@ -74,7 +74,7 @@ struct vfsmount {
 	void *data;
 #ifdef CONFIG_KSU_SUSFS
 	u64 susfs_mnt_id_backup;
-#endif
+#endif	
 } __randomize_layout;
 
 struct file; /* forward dec */
