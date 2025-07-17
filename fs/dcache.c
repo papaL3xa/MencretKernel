@@ -38,11 +38,9 @@
 #include <linux/prefetch.h>
 #include <linux/ratelimit.h>
 #include <linux/list_lru.h>
-
 #ifdef CONFIG_KSU_SUSFS_SUS_PATH
 #include <linux/susfs_def.h>
 #endif
-
 #include <linux/kasan.h>
 
 #include "internal.h"
