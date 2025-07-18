@@ -52,7 +52,7 @@
  * nd->flags => storing flag 'ND_FLAGS_'
  * task_struct->thread_info.flags => storing flag 'TIF_'
  */
- 
+
 #define INODE_STATE_SUS_PATH BIT(24)
 #define INODE_STATE_SUS_MOUNT BIT(25)
 #define INODE_STATE_SUS_KSTAT BIT(26)
