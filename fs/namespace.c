@@ -27,11 +27,9 @@
 #include <linux/bootmem.h>
 #include <linux/task_work.h>
 #include <linux/sched/task.h>
-
 #if defined(CONFIG_KSU_SUSFS_SUS_MOUNT) || defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)
 #include <linux/susfs_def.h>
 #endif
-
 #include <linux/fslog.h>
 
 #include <linux/slub_def.h>
@@ -1526,10 +1524,13 @@ EXPORT_SYMBOL_GPL(vfs_submount);
 static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 					int flag)
 {
+#ifdef CONFIG_RKP_NS_PROT
+	struct super_block *sb = old->mnt->mnt_sb;
+#else
 	struct super_block *sb = old->mnt.mnt_sb;
+#endif
 	struct mount *mnt;
 	int err;
-	
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 	bool is_current_ksu_domain = susfs_is_current_ksu_domain();
 	bool is_current_zygote_domain = susfs_is_current_zygote_domain();
@@ -1574,9 +1575,8 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 	mnt = alloc_vfsmnt(old->mnt_devname, false, 0);
 bypass_orig_flow:
 #else
-	mnt = alloc_vfsmnt(old->mnt_devname);
+ 	mnt = alloc_vfsmnt(old->mnt_devname);
 #endif
-
 	if (!mnt)
 		return ERR_PTR(-ENOMEM);
 
@@ -2326,6 +2326,7 @@ static inline bool may_mandlock(void)
 #endif
 	return capable(CAP_SYS_ADMIN);
 }
+
 
 static int can_umount(const struct path *path, int flags)
 {
@@ -3870,6 +3871,7 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
 	copy_flags = CL_COPY_UNBINDABLE | CL_EXPIRE;
 	if (user_ns != ns->user_ns)
 		copy_flags |= CL_SHARED_TO_SLAVE | CL_UNPRIVILEGED;
+		
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 	// Always let clone_mnt() in copy_tree() know it is from copy_mnt_ns()
 	copy_flags |= CL_COPY_MNT_NS;
@@ -3878,7 +3880,12 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
 		copy_flags |= CL_ZYGOTE_COPY_MNT_NS;
 	}
 #endif
+
+#ifdef CONFIG_RKP_NS_PROT
+	new = copy_tree(old, old->mnt->mnt_root, copy_flags);
+#else
 	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
+#endif
 	if (IS_ERR(new)) {
 		namespace_unlock();
 		free_mnt_ns(new_ns);
