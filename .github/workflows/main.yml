@@ -39,7 +39,7 @@ jobs:
       - name: Upload kernel
         uses: actions/upload-artifact@v4
         with:
-          name: "KernelSU-Next-${{ env.BUILD_KERNEL_VERSION }}-${{ matrix.device }}-stock-One-UI"
+          name: "MencretKernel-${{ env.BUILD_KERNEL_VERSION }}-${{ matrix.device }}-stock-One-UI"
           path: |
             build/*.tar
 
