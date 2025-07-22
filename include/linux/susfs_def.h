@@ -59,4 +59,4 @@
 #define DATA_ADB_NO_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT "/data/adb/susfs_no_auto_add_sus_ksu_default_mount"
 #define DATA_ADB_NO_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT "/data/adb/susfs_no_auto_add_try_umount_for_bind_mount"
 
-#endif // #ifndef KSU_SUSFS_DEF_H
+#endif // #ifndef KSU_SUSFS_DEF_
