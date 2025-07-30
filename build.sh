@@ -70,11 +70,11 @@ rm -rf "${RDIR}/drivers/misc/tzdev"
 if [ "$PHONE" = "S" ]; then
     echo "Using S tzdev driver"
     cp -ar "${RDIR}/prebuilt-images/S/tzdev" "${RDIR}/drivers/misc/tzdev"
-    ;;
+    
 elif [ "$PHONE" = "N" ]; then
     echo "Using N tzdev driver"
     cp -ar "${RDIR}/prebuilt-images/N/tzdev" "${RDIR}/drivers/misc/tzdev"
-    ;;
+    
 fi
 
 #building function
