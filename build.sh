@@ -68,12 +68,12 @@ CC=${RDIR}/toolchain/clang/host/linux-x86/clang-4639204-cfp-jopp/bin/clang
 rm -rf "${RDIR}/drivers/misc/tzdev"
 
 if [ "$PHONE" = "S" ]; then
-    echo "Using S tzdev driver"
-    cp -ar "${RDIR}/prebuilt-images/S/tzdev" "${RDIR}/drivers/misc/tzdev"
+    echo "Using A tzdev driver"
+    cp -ar "${RDIR}/tzdev_setting/A/tzdev" "${RDIR}/drivers/misc/tzdev"
     
 elif [ "$PHONE" = "N" ]; then
-    echo "Using N tzdev driver"
-    cp -ar "${RDIR}/prebuilt-images/N/tzdev" "${RDIR}/drivers/misc/tzdev"
+    echo "Using B tzdev driver"
+    cp -ar "${RDIR}/tzdev_setting/B/tzdev" "${RDIR}/drivers/misc/tzdev"
     
 fi
 
