@@ -1,5 +1,5 @@
 name: build and release
-run-name: 'Release: Build ${{ github.event.inputs.tag }} from ${{ github.sha }}'
+run-name: 'Release: Build ${{ github.event.inputs.tag }} ${{ matrix.device }} from ${{ github.sha }}'
 
 on:
   workflow_dispatch:
