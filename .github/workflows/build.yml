@@ -1,5 +1,5 @@
 name: build and release
-run-name: 'Release: Build ${{ github.workflow }} from ${{ github.job }}'
+run-name: 'Release: Build ${{ github.workflow }} from ${{ github.workspace }}'
 
 on:
   workflow_dispatch:
