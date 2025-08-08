@@ -1,5 +1,5 @@
 name: build and release
-run-name: 'Release: Build ${{ github.workflow }} for ${{ github.event.build.device }} from ${{ github.ref_name }}
+run-name: 'Release: Build ${{ github.workflow }} for ${{ github.job.device }} from ${{ github.ref_name }}
 
 on:
   workflow_dispatch:
