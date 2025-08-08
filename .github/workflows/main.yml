@@ -1,5 +1,5 @@
 name: build test
-run-name: 'Release: Build ${{ github.workflow }} for ${{ github.event.build.device }} from ${{ github.ref_name }}'
+run-name: 'Release: Build ${{ github.workflow }} from ${{ github.ref_name }}'
 
 on:
   workflow_dispatch:
