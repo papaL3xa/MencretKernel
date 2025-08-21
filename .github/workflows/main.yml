@@ -1,5 +1,5 @@
 name: build test
-run-name: 'CI: Build ${{ github.event.inputs.version }} for ${{ matrix.device }}'
+run-name: 'CI: Build ${{ github.event.inputs.version }}'
 
 on:
   workflow_dispatch:
