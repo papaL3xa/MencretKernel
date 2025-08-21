@@ -1,10 +1,17 @@
 name: build test
+run-name: 'CI: Build ${{ github.event.inputs.version }} for ${{ matrix.device }}'
+
 on:
   workflow_dispatch:
-    inputs:      
+    inputs:
+      version:
+        description: 'Kernel Version'
+        required: true
+        default: 'v'      
       tag:
         description: 'Release Tag'
-        required: true        
+        required: true 
+        default: 'trial'
 
 jobs:
   build:
