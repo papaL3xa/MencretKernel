@@ -38,9 +38,9 @@ if [[ -v DEVICES[$MODEL] ]]; then
     read KERNEL_DEFCONFIG SOC BOARD PHONE <<< "${DEVICES[$MODEL]}"
     echo -e "[!] Building a KernelSU enabled kernel for ${MODEL}...\n"
 else
-    echo "Unknown device: $MODEL, setting to beyondxks"
-    export MODEL="beyondxks"
-    read KERNEL_DEFCONFIG SOC BOARD PHONE <<< "${DEVICES[beyondxks]}"
+    echo "Unknown device: $MODEL, setting to d1"
+    export MODEL="d1"
+    read KERNEL_DEFCONFIG SOC BOARD PHONE <<< "${DEVICES[d1]}"
 fi
 
 #kernelversion
