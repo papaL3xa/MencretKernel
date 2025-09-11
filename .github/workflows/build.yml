@@ -1,17 +1,17 @@
-name: build and release
+name: Build and Release
 
 on:
   workflow_dispatch:
-    inputs:      
+    inputs:
       tag:
-        description: 'Release Tag'
-        required: true        
+        description: "Release Tag"
+        required: true
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     permissions:
-      contents: write    
+      contents: write
 
     steps:
       - name: Checkout source
@@ -19,60 +19,41 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Install packages & setup
+      - name: Install dependencies & setup
         run: |
-          sudo apt update -y   
-          sudo apt install libncurses5-dev python-is-python3 libtinfo6 -y
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential bc git wget curl unzip \
+            libssl-dev flex bison libncurses-dev libtinfo6 \
+            python3 python3-pip
+          # fallback: symlink python if scripts call python2
+          if ! command -v python &>/dev/null; then
+            sudo ln -sf /usr/bin/python3 /usr/bin/python
+          fi
           bash init_clang_13.sh
-          
+
       - name: Set environment variable
-        run: |
-          echo "LPOS_KERNEL_VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
-          
-      - name: Building LPoS
+        run: echo "LPOS_KERNEL_VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+
+      - name: Build LPoS
         run: |
           export PATH=$HOME/:$PWD/toolchain/bin:$PATH
           bash build_kernel.sh -c
 
-      - name: Building LPoS + KernelSU
-        run: |
-          export PATH=$HOME/:$PWD/toolchain/bin:$PATH
-          bash build_kernel.sh -k          
-
-      - name: Upload kernel
+      - name: Upload kernel artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: "LPoS-${{ env.LPOS_KERNEL_VERSION }}-[Note 10]"
+          name: "LPoS-${{ env.LPOS_KERNEL_VERSION }}-[N10]"
           path: |
             out/LPoS*.zip
-            out/KSU*.zip
 
-      - name: Create release
+      - name: Create GitHub release
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ github.event.inputs.tag }}
           name: "LPoS Kernel ${{ env.LPOS_KERNEL_VERSION }}"
           draft: false
           prerelease: false
-          token: ${{ secrets.TOKEN }}          
+          token: ${{ secrets.TOKEN }}
           artifacts: "out/LPoS*.zip,out/KSU*.zip"
           body: "Commit SHA: ${{ github.sha }}"
-
-      - name: Upload to Telegram
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          document: "out/LPoS*.zip,out/KSU*.zip"
-          format: html
-          disable_web_page_preview: false
-          message: |
-            <b>New Kernel Build found..! 🎉</b>
-
-            <b>Device :</b> Note 10 (d1)  
-            <b>Kernel Version :</b> ${{ env.LPOS_KERNEL_VERSION }}                    
-            <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">${{ github.repository }}</a>
-            
-            <b>Commit SHA:</b> <a href="https://github.com/${{ github.repository }}/commit/${{github.sha}}">Click here</a>
-            
-            <b>Installation :</b> <a href="https://telegra.ph/LPoS-Kernel-Installation-Guide-02-09">Click here</a>          
