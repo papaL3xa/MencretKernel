@@ -1,0 +1,3 @@
+[submodule "KernelSU-Next"]
+	path = KernelSU-Next
+	url = https://github.com/ravindu644/Wild_KSU.git
