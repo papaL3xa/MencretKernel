@@ -63,5 +63,5 @@ jobs:
           draft: false
           prerelease: false
           token: ${{ secrets.TOKEN }}          
-          artifacts: "artifacts/**/*.tar"
+          artifacts: "out/LPoS*.zip"
           body: "Commit SHA: ${{ github.sha }}"
