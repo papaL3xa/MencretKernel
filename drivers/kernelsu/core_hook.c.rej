@@ -1,0 +1,20 @@
+--- drivers/kernelsu/core_hook.c
++++ drivers/kernelsu/core_hook.c
+@@ -375,7 +375,7 @@ static int ksu_task_prctl(int option, unsigned long arg2, unsigned long arg3,
+ 	return -ENOSYS;
+ }
+ // kernel 4.4 and 4.9
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
++#if 1
+ static int ksu_key_permission(key_ref_t key_ref, const struct cred *cred,
+ 			      unsigned perm)
+ {
+@@ -400,7 +400,7 @@ static int ksu_inode_rename(struct inode *old_inode, struct dentry *old_dentry,
+ 	LSM_HOOK_INIT(task_prctl, ksu_task_prctl),
+ 	LSM_HOOK_INIT(inode_rename, ksu_inode_rename),
+ 	LSM_HOOK_INIT(task_fix_setuid, ksu_task_fix_setuid),
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 10, 0)
++#if 1
+ 	LSM_HOOK_INIT(key_permission, ksu_key_permission)
+ #endif
+ };
