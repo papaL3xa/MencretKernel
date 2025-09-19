@@ -23,7 +23,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        device: ${{ fromJSON(github.event.inputs.devices) }}
+        
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -42,9 +47,8 @@ jobs:
           
       - name: Building Kernel
         env:
-          MODEL: ${{ github.event.inputs.model }}
         run: |
-            bash build.sh $MODEL
+            bash build.sh ${{ matrix.device }}
 
       - name: Upload kernel
         uses: actions/upload-artifact@v4
