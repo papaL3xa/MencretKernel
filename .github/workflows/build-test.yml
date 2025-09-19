@@ -5,7 +5,21 @@ on:
       tag:
         description: 'Release Tag'
         required: true        
-
+      devices:
+        description: 'Devices'
+        required: true
+        type: choice
+        options: 
+          - [d1]
+          - [d1x]
+          - [d2s]
+          - [d2x]
+          - [beyond0]
+          - [beyond1]
+          - [beyond2]
+          - [beyondxks]
+          - [beyond2, beyond1, beyond0, beyondxks, d1, d2s, d1x, d2x]
+          
 jobs:
   build:
     runs-on: ubuntu-22.04
