@@ -10,6 +10,14 @@ on:
         required: true
         type: choice
         options: 
+          - [beyond2]
+          - [beyond1]
+          - [beyond0]
+          - [beyondxks]
+          - [d1]
+          - [d2s]
+          - [d1x]
+          - [d2x]
           - [beyond2, beyond1, beyond0, beyondxks, d1, d2s, d1x, d2x]
           
 jobs:
