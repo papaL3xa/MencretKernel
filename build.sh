@@ -56,6 +56,11 @@ export ARCH=arm64
 export PLATFORM_VERSION=12
 export ANDROID_MAJOR_VERSION=s
 
+# fix toolchain:
+export CLANG_PATH=$(pwd)/toolchain/clang/host/linux-x86/clang-4639204-cfp-jopp/bin
+export PATH=$CLANG_PATH:$PATH
+export CC=clang
+
 # init clang-r383902b
 if [ ! -d "${HOME}/toolchains/clang-r383902b" ]; then
     echo -e "\n[INFO] Cloning clang-r383902b...\n"
