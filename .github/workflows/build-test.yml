@@ -18,7 +18,6 @@ on:
           - [d2s]
           - [d1x]
           - [d2x]
-          - [beyond2, beyond1, beyond0, beyondxks, d1, d2s, d1x, d2x]
           
 jobs:
   build:
@@ -54,4 +53,4 @@ jobs:
         with:
           name: "MencretKernel-${{ env.BUILD_KERNEL_VERSION }}-${{ matrix.device }}-stock-One-UI"
           path: |
-            build/out/${{ matrix.device }}/zip/*
+            build/*.zip
