@@ -41,7 +41,7 @@ jobs:
         with:
           name: "MencretKernel-${{ env.BUILD_KERNEL_VERSION }}-${{ matrix.device }}-stock-One-UI"
           path: |
-            build/*.tar
+            build/*.zip
 
   release:
     needs: build
@@ -63,5 +63,5 @@ jobs:
           draft: false
           prerelease: false
           token: ${{ secrets.TOKEN }}          
-          artifacts: "artifacts/**/*.tar"
+          artifacts: "artifacts/**/*.zip"
           body: "Commit SHA: ${{ github.sha }}"

@@ -129,13 +129,13 @@ build_boot() {
     cd ${RDIR}/AIK-Linux && ./repackimg.sh --nosudo && mv image-new.img ${RDIR}/build/boot.img
 }
 
-#build odin flashable tar
-build_tar(){
-    cp "${RDIR}/prebuilt-images/dt_exynos${SOC}.img.lz4" "${RDIR}/build/dt.img.lz4" && cd ${RDIR}/build
-    tar -cvf "MencretKernel-${MODEL}-${BUILD_KERNEL_VERSION}-stock-One-UI.tar" boot.img dt.img.lz4 && rm boot.img dt.img.lz4
+#build Zip flashable 
+build_zip(){
+    cp "${RDIR}/prebuilt-images/dt_exynos${SOC}.img" "${RDIR}/build/dt.img" && cd ${RDIR}/build
+    zip -cvf "MencretKernel-${MODEL}-${BUILD_KERNEL_VERSION}-stock-One-UI.zip" boot.img dt.img && rm boot.img dt.img
     echo -e "\n[i] Build Finished..!\n" && cd ${RDIR}
 }
 
 build_ksu
 build_boot
-build_tar
+build_zip
