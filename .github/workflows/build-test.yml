@@ -53,4 +53,4 @@ jobs:
         with:
           name: "MencretKernel-${{ env.BUILD_KERNEL_VERSION }}-${{ matrix.device }}-stock-One-UI"
           path: |
-            build/*.zip
+            build/*.tar
