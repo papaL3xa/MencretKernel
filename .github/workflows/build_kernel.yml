@@ -1,0 +1,68 @@
+name: Build-Test
+run-name: 'CI: Build ${{ github.event.inputs.version }} for device ${{ github.event.inputs.devices }}'
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Kernel Version'
+        required: true
+        default: 'v'
+      ksun:
+        description: 'Install KernelSU-Next ?'
+        required: true
+        default: 'y'
+      llvm:
+        description: 'Clang (12-20) or Neutron (Latest) Version'
+        required: true
+        default: 'latest'
+      devices:
+        description: 'Devices'
+        required: true
+        type: choice
+        options: 
+          - [d1]
+          - [d1xks]
+          - [d2s]
+          - [d2x]
+          - [beyond0lte]
+          - [beyond1lte]
+          - [beyond2lte]
+          - [beyondx]
+          - [d1, d1xks, d2s, d2x, beyond0lte, beyond1lte, beyond2lte, beyondx]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        device: ${{ fromJSON(github.event.inputs.devices) }}
+
+    steps:
+      - name: Checkout Tree
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Build Environment
+        run: |
+          sudo apt update && sudo apt upgrade -y && sudo apt install --no-install-recommends -y build-essential gcc-aarch64-linux-gnu clang lld llvm
+          
+      - name: Set Environment Variable
+        run: |
+          SHA=$(git rev-parse --short ${{ github.sha }})
+          echo BUILD_DATE=$(date +'%Y%m%d') >> $GITHUB_ENV
+          echo BUILD_KERNEL_VERSION=CI-${{ github.event.inputs.version }}-$SHA >> $GITHUB_ENV
+          
+      - name: Building Kernel
+        run: |
+            bash build_kernel.sh -m ${{ matrix.device }} -v ${{ github.event.inputs.version }} -k ${{ github.event.inputs.ksun }} -l ${{ github.event.inputs.llvm }} -r n
+
+      - name: Upload Kernel
+        uses: actions/upload-artifact@v4
+        with:
+          name: "MencretKernel-${{ github.event.inputs.version }}-${{ env.BUILD_DATE }}-${{ env.BUILD_DEVICE }}-${{ matrix.device }}-Clang${{ github.event.inputs.clang }}"
+          path: "build/out/${{ matrix.device }}/zip/*"
+          if-no-files-found: error
