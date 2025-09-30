@@ -1,5 +1,5 @@
-name: Build-Test
-run-name: 'CI: Build ${{ github.event.inputs.version }} for device ${{ github.event.inputs.devices }}'
+name: Build_Kernel
+run-name: 'BK: Build ${{ github.event.inputs.version }} for device ${{ github.event.inputs.devices }}'
 
 on:
   workflow_dispatch:
