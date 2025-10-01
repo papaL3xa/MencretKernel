@@ -1437,13 +1437,18 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 
 #ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 	// For newly created mounts, the only caller process we care is KSU
-	if (unlikely(susfs_is_current_ksu_domain())) {
-		mnt = alloc_vfsmnt(name, true, 0);
+	// We won't check it anymore if boot-completed stage is triggered.
+	if (susfs_is_boot_completed_triggered) {
+		goto orig_flow;
+	}
+	if (susfs_is_current_ksu_domain()) {
+		mnt = susfs_alloc_sus_vfsmnt(name);
 		goto bypass_orig_flow;
 	}
 	mnt = alloc_vfsmnt(name, false, 0);
 bypass_orig_flow:
 #else
+orig_flow:
 	mnt = alloc_vfsmnt(name);
 #endif
 	if (!mnt)
@@ -1564,25 +1569,17 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 		}
 		goto bypass_orig_flow;
 	}
-	// Secondly, check if it is zygote process and no matter it is doing unshare or not
-	if (likely(is_current_zygote_domain) && (old->mnt_id >= DEFAULT_SUS_MNT_ID)) {
-		/* Important Note: 
-		 *  - Here we can't determine whether the unshare is called zygisk or not,
-		 *    so we can only patch out the unshare code in zygisk source code for now
-		 *  - But at least we can deal with old sus mounts using alloc_vfsmnt()
-		 */
-		mnt = alloc_vfsmnt(old->mnt_devname, true, 0);
-		goto bypass_orig_flow;
-	}
-	// Lastly, for other process that is doing unshare operation, but only deal with old sus mount
-	if ((flag & CL_COPY_MNT_NS) && (old->mnt_id >= DEFAULT_SUS_MNT_ID)) {
-		mnt = alloc_vfsmnt(old->mnt_devname, true, 0);
+	if (susfs_is_current_ksu_domain() ||
+		old->mnt_id >= DEFAULT_KSU_MNT_ID ||
+		old->mnt_parent->mnt_id >= DEFAULT_KSU_MNT_ID)
+	{
+		mnt = susfs_alloc_sus_vfsmnt(old->mnt_devname);
 		goto bypass_orig_flow;
 	}
 	mnt = alloc_vfsmnt(old->mnt_devname, false, 0);
 bypass_orig_flow:
 #else
- 	mnt = alloc_vfsmnt(old->mnt_devname);
+	mnt = alloc_vfsmnt(old->mnt_devname);
 #endif
 
 	if (!mnt)
@@ -1671,14 +1668,6 @@ bypass_orig_flow:
 	mnt->mnt_mountpoint = mnt->mnt.mnt_root;
 #endif
 	mnt->mnt_parent = mnt;
-
-#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
-	// If caller process is zygote and not doing unshare, so we just reorder the mnt_id
-	if (likely(is_current_zygote_domain) && !(flag & CL_ZYGOTE_COPY_MNT_NS)) {
-		mnt->mnt.susfs_mnt_id_backup = mnt->mnt_id;
-		mnt->mnt_id = current->susfs_last_fake_mnt_id++;
-	}
-#endif
 
 	lock_mount_hash();
 	list_add_tail(&mnt->mnt_instance, &sb->s_mounts);
