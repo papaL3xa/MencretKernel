@@ -47,6 +47,7 @@ jobs:
         with:
           name: "MencretKernel-${{ env.BUILD_KERNEL_VERSION }}-${{ env.BUILD_DATE }}-${{ matrix.device }}-stock-One-UI"
           path: "build/*.tar"
+          if-no-files-found: error
 
   telegram-notification:
     needs: build
@@ -71,10 +72,32 @@ jobs:
           disable_web_page_preview: false
           message: |
             🚀 <b>MencretKernel ${{ env.BUILD_KERNEL_VERSION }} - Build Completed!</b>
-            📱 <b>Supported Devices:</b> d1, d2s, d1x, d2x (Note10), beyond2, beyond1, beyond0, beyondxks (S10)
+
+            📱 <b>Supported Devices:</b> 
+            - Note10 Series: d1, d1xks, d2s, d2x
+            - S10 Series: beyond0lte, beyond1lte, beyond2lte, beyondx
+
+            📦 <b>Build Details:</b>
             ⚙️ <b>Version:</b> ${{ env.BUILD_KERNEL_VERSION }}
             📅 <b>Build Date:</b> ${{ env.BUILD_DATE }}
+            ☠️ <b>Commit:</b> ${{ github.sha }}
+
+            💬 <b>For Discussion:</b>
+            https://t.me/PapaL3xaKernel/2
+
+            📝 <b>Version Information:</b>
+            v1.0.0 - Initial release
+            v1.0.1 - Patch release  
+            v1.1.0 - Minor release
+            v2.0.0 - Major release
+
             🔗 <b>Release:</b> <a href="https://github.com/${{ github.repository }}/releases">GitHub</a>
+
+            <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">MencretKernel</a>
+
+            <b>Commit SHA:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">Click here</a>
+
+            <b>Installation Guide:</b> <a href="https://telegra.ph/MencretKernel-Installation-Guide-10-03">Click here</a>
 
   release:
     needs: build  # Hanya perlu build, tidak perlu telegram-notification
@@ -88,16 +111,52 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create Release
+      - name: Set Release Token
+        id: set-token
+        run: |
+          if [ -n "${{ github.event.inputs.token }}" ] && [ "${{ github.event.inputs.token }}" != "" ]; then
+            echo "RELEASE_TOKEN=${{ github.event.inputs.token }}" >> $GITHUB_ENV
+          else
+            echo "RELEASE_TOKEN=${{ github.token }}" >> $GITHUB_ENV
+          fi
+
+      - name: Release Build Kernel
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ github.event.inputs.version }}
-          name: "MencretKernel-${{ github.event.inputs.version }}"
+          name: "MencretKernel-${{ github.event.inputs.version }}-Stock OneUI4.X"
           draft: false
           prerelease: false
+          generateReleaseNotes: true
+          makeLatest: true
+          skipIfReleaseExists: false
           token: ${{ secrets.GITHUB_TOKEN }}  # Gunakan GITHUB_TOKEN default
+          removeArtifacts: true
           artifacts: "artifacts/**/*.tar"
           body: |
-            MencretKernel ${{ github.event.inputs.version }}
-            Build Date: $(date +'%Y-%m-%d')
-            Commit: ${{ github.sha }}
+            # 🚀 MencretKernel ${{ env.BUILD_KERNEL_VERSION }} - Build Completed!
+            
+            # 📱 Supported Devices: 
+            - Note10 Series: d1, d1xks, d2s, d2x
+            - S10 Series: beyond0lte, beyond1lte, beyond2lte, beyondx
+
+            # 📦 Build Details:
+            ⚙️ <b>Version:</b> ${{ env.BUILD_KERNEL_VERSION }}
+            📅 <b>Build Date:</b> ${{ env.BUILD_DATE }}
+            ☠️ <b>Commit:</b> ${{ github.sha }}
+
+            # 💬 For Discussion:
+            https://t.me/PapaL3xaKernel/2
+            
+            # 📝 Version Information:
+            v1.0.0 - Initial release
+            v1.0.1 - Patch release  
+            v1.1.0 - Minor release
+            v2.0.0 - Major release
+
+            # 🔗 Release:</b> <a href="https://github.com/${{ github.repository }}/releases">GitHub</a>
+            #  Installation Guide: <a href="https://telegra.ph/MencretKernel-Installation-Guide-10-03">Click here</a>
+
+            <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">MencretKernel</a>
+
+            <b>Commit SHA:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">Click here</a>
