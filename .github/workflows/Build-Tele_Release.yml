@@ -1,4 +1,4 @@
-name: build and release
+name: build and release to Telegram
 
 on:
   workflow_dispatch:
