@@ -1,4 +1,5 @@
 name: build and release to Telegram
+run-name: 'Release: Build ${{ github.event.inputs.version }} for S10,N10 Series'
 
 on:
   workflow_dispatch:
@@ -30,6 +31,9 @@ jobs:
           
       - name: Set environment variable
         run: |
+          SHA=$(git rev-parse --short ${{ github.sha }})
+          echo BUILD_DATE=$(date +'%Y%m%d') >> $GITHUB_ENV
+          echo COMMIT_SHA=$SHA >> $GITHUB_ENV
           echo "BUILD_KERNEL_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
           
       - name: Building Kernel
@@ -39,11 +43,11 @@ jobs:
       - name: Upload kernel
         uses: actions/upload-artifact@v4
         with:
-          name: "MencretKernel-${{ env.BUILD_KERNEL_VERSION }}-${{ matrix.device }}-stock-One-UI"
+          name: "MencretKernel-${{ env.BUILD_KERNEL_VERSION }}-${{ env.BUILD_DATE }}-${{ matrix.device }}-stock-One-UI"
           path: |
             build/*.tar
 
-  release:
+  telegram-notification:
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -70,10 +74,9 @@ jobs:
             • beyond2, beyond1, beyond0, beyondxks (S10 Series)
             
             ⚙️ <b>Build Details:</b>
-            • Kernel Name: BatAxeKernel
+            • Kernel Name: MencretKernel
             • Version: ${{ github.event.inputs.version }}
-            • KernelSU: ${{ github.event.inputs.ksun }}
-            • Clang: ${{ github.event.inputs.llvm }}
+            • KernelSU: yes
             • Build Date: ${{ env.BUILD_DATE }}
             
             📦 <b>Status:</b> Preparing GitHub Release...
@@ -90,11 +93,23 @@ jobs:
             
             <b>Installation Guide:</b> <a href="https://telegra.ph/MencretKernel-Installation-Guide-10-03">Click here</a>
 
-      - name: Create release
+  release:
+    needs: [build, telegram-notification]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write    
+
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release Kernel
         uses: ncipollo/release-action@v1
         with:
-          tag: ${{ github.event.inputs.tag }}
-          name: "MencretKernel-stock-One-UI-${{ github.event.inputs.tag }}"
+          tag: ${{ github.event.inputs.version }}
+          name: "MencretKernel-${{ github.event.inputs.version }}-${{ env.BUILD_DATE }}-stock-One-UI"
           draft: false
           prerelease: false
           token: ${{ secrets.TOKEN }}          
@@ -116,4 +131,5 @@ jobs:
             
             🎉 <b>Release is now live and available for download!</b>
             
-            Built by <b><a href="https://github.com/${{ github.repository }}">PapaL3xa</a></b>
+            ❤️ THANK YOU ❤️
+            🪶Built by <b><a href="https://github.com/${{ github.repository }}">PapaL3xa</a></b>🪶
