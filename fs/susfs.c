@@ -49,7 +49,7 @@ static LIST_HEAD(LH_SUS_PATH_ANDROID_DATA);
 static LIST_HEAD(LH_SUS_PATH_SDCARD);
 static struct st_android_data_path android_data_path = {0};
 static struct st_sdcard_path sdcard_path = {0};
-const struct qstr susfs_fake_qstr_name = QSTR_INIT("..5.u.S", 7); // used to re-test the dcache lookup, make sure you don't have file named like this!!
+const struct qstr susfs_fake_qstr_name = QSTR_INIT("..5ns5!F5", 9); // used to re-test the dcache lookup, make sure you don't have file named like this!!
 
 int susfs_set_i_state_on_external_dir(char __user* user_info, int cmd) {
 	struct path path;
@@ -354,16 +354,19 @@ void susfs_run_sus_path_loop(uid_t uid) {
 }
 
 static inline bool is_i_uid_in_android_data_not_allowed(uid_t i_uid) {
-	return (likely(susfs_is_current_proc_umounted()) &&
+	uid_t cur_uid = current_uid().val;
+	return (likely(susfs_is_current_non_root_user_app_proc()) &&
 		unlikely(current_uid().val != i_uid));
+
 }
 
 static inline bool is_i_uid_in_sdcard_not_allowed(void) {
-	return (likely(susfs_is_current_proc_umounted()));
+	return (likely(susfs_is_current_non_root_user_app_proc()));
 }
 
 static inline bool is_i_uid_not_allowed(uid_t i_uid) {
-	return (likely(susfs_is_current_proc_umounted()) &&
+	uid_t cur_uid = current_uid().val;
+	return (likely(susfs_is_current_non_root_user_app_proc()) &&
 		unlikely(current_uid().val != i_uid));
 }
 
@@ -1319,3 +1322,7 @@ void susfs_init(void) {
 
 /* No module exit is needed becuase it should never be a loadable kernel module */
 //void __init susfs_exit(void)
+<<<<<<< HEAD
+=======
+
+>>>>>>> 58ea09ba1 ([PATCH] treewide: Implement susfs v1.5.12)

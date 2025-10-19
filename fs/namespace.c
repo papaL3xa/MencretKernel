@@ -32,7 +32,6 @@
 #include <linux/susfs_def.h>
 #endif
 
-#include <linux/fslog.h>
 #include <linux/slub_def.h>
 #include "pnode.h"
 #include "internal.h"
@@ -41,6 +40,32 @@
 extern bool susfs_is_current_ksu_domain(void);
 extern bool susfs_is_current_zygote_domain(void);
 extern bool susfs_is_boot_completed_triggered;
+
+static DEFINE_IDA(susfs_mnt_id_ida);
+static DEFINE_IDA(susfs_mnt_group_ida);
+static int susfs_mnt_id_start = DEFAULT_SUS_MNT_ID;
+static int susfs_mnt_group_start = DEFAULT_SUS_MNT_GROUP_ID;
+
+#define CL_ZYGOTE_COPY_MNT_NS BIT(24) /* used by copy_mnt_ns() */
+#define CL_COPY_MNT_NS BIT(25) /* used by copy_mnt_ns() */
+#endif
+
+#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT
+extern void susfs_auto_add_sus_ksu_default_mount(const char __user *to_pathname);
+bool susfs_is_auto_add_sus_ksu_default_mount_enabled = true;
+#endif
+#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
+extern int susfs_auto_add_sus_bind_mount(const char *pathname, struct path *path_target);
+bool susfs_is_auto_add_sus_bind_mount_enabled = true;
+#endif
+#ifdef CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
+extern void susfs_auto_add_try_umount_for_bind_mount(struct path *path);
+bool susfs_is_auto_add_try_umount_for_bind_mount_enabled = true;
+#endif
+
+#ifdef CONFIG_RKP_NS_PROT
+#define KDP_MOUNT_SYSTEM "/system"
+#define KDP_MOUNT_SYSTEM_LEN strlen(KDP_MOUNT_SYSTEM)
 
 static DEFINE_IDA(susfs_mnt_id_ida);
 static DEFINE_IDA(susfs_mnt_group_ida);
@@ -1492,7 +1517,7 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 	bool is_current_ksu_domain = susfs_is_current_ksu_domain();
 	bool is_current_zygote_domain = susfs_is_current_zygote_domain();
 
-	/* - It is very important that we need to use CL_COPY_MNT_NS to identify whether 
+	/* - It is very important that we need to use CL_COPY_MNT_NS to identify whether
 	 *   the clone is a copy_tree() or single mount like called by __do_loopback()
 	 * - if caller process is KSU, consider the following situation:
 	 *     1. it is NOT doing unshare => call alloc_vfsmnt() to assign a new sus mnt_id
@@ -1516,7 +1541,7 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 	}
 	// Secondly, check if it is zygote process and no matter it is doing unshare or not
 	if (likely(is_current_zygote_domain) && (old->mnt_id >= DEFAULT_SUS_MNT_ID)) {
-		/* Important Note: 
+		/* Important Note:
 		 *  - Here we can't determine whether the unshare is called zygisk or not,
 		 *    so we can only patch out the unshare code in zygisk source code for now
 		 *  - But at least we can deal with old sus mounts using alloc_vfsmnt()
@@ -1530,7 +1555,7 @@ static struct mount *clone_mnt(struct mount *old, struct dentry *root,
 		goto bypass_orig_flow;
 	}
 	mnt = alloc_vfsmnt(old->mnt_devname, false, 0);
-bypass_orig_flow:
+	bypass_orig_flow:
 #else
 	mnt = alloc_vfsmnt(old->mnt_devname);
 #endif
@@ -3784,6 +3809,11 @@ struct mnt_namespace *copy_mnt_ns(unsigned long flags, struct mnt_namespace *ns,
 		// Let clone_mnt() in copy_tree() know copy_mnt_ns() is run by zygote process
 		copy_flags |= CL_ZYGOTE_COPY_MNT_NS;
 	}
+	#endif
+#ifdef CONFIG_RKP_NS_PROT
+	new = copy_tree(old, old->mnt->mnt_root, copy_flags);
+#else
+	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
 #endif
 	new = copy_tree(old, old->mnt.mnt_root, copy_flags);
 	if (IS_ERR(new)) {

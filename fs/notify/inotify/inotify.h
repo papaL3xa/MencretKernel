@@ -17,7 +17,6 @@ struct inotify_inode_mark {
 };
 
 #define INOTIFY_USER_MASK (IN_ALL_EVENTS | IN_ONESHOT | IN_EXCL_UNLINK)
-
 static inline __u32 inotify_mark_user_mask(struct fsnotify_mark *fsn_mark)
 {
 	return fsn_mark->mask & INOTIFY_USER_MASK;
