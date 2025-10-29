@@ -51,7 +51,7 @@
  * task_struct->thread_info.flags => storing flag 'TIF_'
  */
 //#define TASK_STRUCT_NON_ROOT_USER_APP_PROC BIT(24)
-#define TIF_NON_ROOT_USER_APP_PROC 33 // thread_info->flags is unsigned long :D
+#define TIF_PROC_UMOUNTED 33 // thread_info->flags is unsigned long :D
 
 #define AS_FLAGS_SUS_PATH 24
 #define AS_FLAGS_SUS_MOUNT 25
