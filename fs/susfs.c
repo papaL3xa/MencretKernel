@@ -49,7 +49,7 @@ static LIST_HEAD(LH_SUS_PATH_ANDROID_DATA);
 static LIST_HEAD(LH_SUS_PATH_SDCARD);
 static struct st_android_data_path android_data_path = {0};
 static struct st_sdcard_path sdcard_path = {0};
-const struct qstr susfs_fake_qstr_name = QSTR_INIT("..5ns5!F5", 9); // used to re-test the dcache lookup, make sure you don't have file named like this!!
+const struct qstr susfs_fake_qstr_name = QSTR_INIT("..5.u.S", 7); // used to re-test the dcache lookup, make sure you don't have file named like this!!
 
 int susfs_set_i_state_on_external_dir(char __user* user_info, int cmd) {
 	struct path path;
@@ -354,19 +354,16 @@ void susfs_run_sus_path_loop(uid_t uid) {
 }
 
 static inline bool is_i_uid_in_android_data_not_allowed(uid_t i_uid) {
-	uid_t cur_uid = current_uid().val;
-	return (likely(susfs_is_current_non_root_user_app_proc()) &&
+	return (likely(susfs_is_current_proc_umounted()) &&
 		unlikely(current_uid().val != i_uid));
-
 }
 
 static inline bool is_i_uid_in_sdcard_not_allowed(void) {
-	return (likely(susfs_is_current_non_root_user_app_proc()));
+	return (likely(susfs_is_current_proc_umounted()));
 }
 
 static inline bool is_i_uid_not_allowed(uid_t i_uid) {
-	uid_t cur_uid = current_uid().val;
-	return (likely(susfs_is_current_non_root_user_app_proc()) &&
+	return (likely(susfs_is_current_proc_umounted()) &&
 		unlikely(current_uid().val != i_uid));
 }
 
@@ -474,7 +471,7 @@ static void susfs_update_sus_mount_inode(char *target_pathname) {
 	 */
 	mnt = real_mount(p.mnt);
 	if (mnt->mnt_group_id > 0 && // 0 means no peer group
-		mnt->mnt_group_id < DEFAULT_SUS_MNT_GROUP_ID) {
+		mnt->mnt_group_id < DEFAULT_KSU_MNT_GROUP_ID) {
 		SUSFS_LOGE("skip setting SUS_MOUNT inode state for path '%s' since its source mount has a legit peer group id\n", target_pathname);
 		return;
 	}
@@ -545,26 +542,24 @@ int susfs_add_sus_mount(struct st_susfs_sus_mount* __user user_info) {
 }
 
 #ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
-int susfs_auto_add_sus_bind_mount(const char *pathname, struct path *path_target) {
+void susfs_auto_add_sus_bind_mount(const char *pathname, struct path *path_target) {
 	struct mount *mnt;
 	struct inode *inode;
 
 	mnt = real_mount(path_target->mnt);
 	if (mnt->mnt_group_id > 0 && // 0 means no peer group
-		mnt->mnt_group_id < DEFAULT_SUS_MNT_GROUP_ID) {
-		SUSFS_LOGE("skip setting SUS_MOUNT inode state for path '%s' since its source mount has a legit peer group id\n", pathname);
-		// return 0 here as we still want it to be added to try_umount list
-		return 0;
+		mnt->mnt_group_id < DEFAULT_KSU_MNT_GROUP_ID) {
+		// Just return here
+		return;
 	}
 	inode = path_target->dentry->d_inode;
-	if (!inode) return 1;
+	if (!inode) return;
 	if (!(inode->i_mapping->flags & BIT_SUS_MOUNT)) {
 		spin_lock(&inode->i_lock);
 		set_bit(AS_FLAGS_SUS_MOUNT, &inode->i_mapping->flags);
 		spin_unlock(&inode->i_lock);
 		SUSFS_LOGI("set SUS_MOUNT inode state for source bind mount path '%s'\n", pathname);
 	}
-	return 0;
 }
 #endif // #ifdef CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT
 
@@ -881,12 +876,9 @@ void susfs_try_umount(uid_t target_uid) {
 
 #ifdef CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT
 void susfs_auto_add_try_umount_for_bind_mount(struct path *path) {
-	struct st_susfs_try_umount_list *cursor = NULL, *temp = NULL;
 	struct st_susfs_try_umount_list *new_list = NULL;
 	char *pathname = NULL, *dpath = NULL;
-#ifdef CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT
-	bool is_magic_mount_path = false;
-#endif
+	size_t new_pathname_len = 0;
 
 #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 	if (path->dentry->d_inode->i_mapping->flags & BIT_SUS_KSTAT) {
@@ -907,42 +899,28 @@ void susfs_auto_add_try_umount_for_bind_mount(struct path *path) {
 		goto out_free_pathname;
 	}
 
-#ifdef CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT
-	if (strstr(dpath, MAGIC_MOUNT_WORKDIR)) {
-		is_magic_mount_path = true;
-	}
-#endif
-
-	list_for_each_entry_safe(cursor, temp, &LH_TRY_UMOUNT_PATH, list) {
-#ifdef CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT
-		if (is_magic_mount_path && strstr(dpath, cursor->info.target_pathname)) {
-			goto out_free_pathname;
+	// - Important to check if it is from a magic mount, if so, then we need only
+	//   the path which is directory only, others should be skipped.
+	// - We need to strip out "/debug_ramdisk/workdir" here since there will be
+	//   no "/debug_ramdisk/workdir" prefixed in zygote mnt ns
+	if (!strncmp(dpath, "/debug_ramdisk/workdir/", 23)) {
+		if (path->dentry->d_inode && S_ISDIR(path->dentry->d_inode->i_mode)) {
+			new_pathname_len = strlen(dpath) - 22;
+			memmove(dpath, dpath+22, new_pathname_len);
+			*(dpath + new_pathname_len) = '\0';
+			goto add_to_new_list;
 		}
-#endif
-		if (unlikely(!strcmp(dpath, cursor->info.target_pathname))) {
-			SUSFS_LOGE("target_pathname: '%s', ino: %lu, is already created in LH_TRY_UMOUNT_PATH\n",
-							dpath, path->dentry->d_inode->i_ino);
-			goto out_free_pathname;
-		}
+		goto out_free_pathname;
 	}
 
+add_to_new_list:
 	new_list = kmalloc(sizeof(struct st_susfs_try_umount_list), GFP_KERNEL);
 	if (!new_list) {
 		SUSFS_LOGE("no enough memory\n");
 		goto out_free_pathname;
 	}
 
-#ifdef CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT
-	if (is_magic_mount_path) {
-		strncpy(new_list->info.target_pathname, dpath + strlen(MAGIC_MOUNT_WORKDIR), SUSFS_MAX_LEN_PATHNAME-1);
-		goto out_add_to_list;
-	}
-#endif
 	strncpy(new_list->info.target_pathname, dpath, SUSFS_MAX_LEN_PATHNAME-1);
-
-#ifdef CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT
-out_add_to_list:
-#endif
 
 	new_list->info.mnt_mode = TRY_UMOUNT_DETACH;
 
@@ -1203,18 +1181,6 @@ out:
 }
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_SU
 
-static int copy_config_to_buf(const char *config_string, char *buf_ptr, size_t *copied_size, size_t bufsize) {
-	size_t tmp_size = strlen(config_string);
-
-	*copied_size += tmp_size;
-	if (*copied_size >= bufsize) {
-		SUSFS_LOGE("bufsize is not big enough to hold the string.\n");
-		return -EINVAL;
-	}
-	strncpy(buf_ptr, config_string, tmp_size);
-	return 0;
-}
-
 /* sus_map */
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 int susfs_add_sus_map(struct st_susfs_sus_map* __user user_info) {
@@ -1249,6 +1215,18 @@ out_path_put_path:
 	return err;
 }
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+
+static int copy_config_to_buf(const char *config_string, char *buf_ptr, size_t *copied_size, size_t bufsize) {
+	size_t tmp_size = strlen(config_string);
+
+	*copied_size += tmp_size;
+	if (*copied_size >= bufsize) {
+		SUSFS_LOGE("bufsize is not big enough to hold the string.\n");
+		return -EINVAL;
+	}
+	strncpy(buf_ptr, config_string, tmp_size);
+	return 0;
+}
 
 int susfs_get_enabled_features(char __user* buf, size_t bufsize) {
 	char *kbuf = NULL, *buf_ptr = NULL;
@@ -1328,11 +1306,6 @@ int susfs_get_enabled_features(char __user* buf, size_t bufsize) {
 #endif
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 	err = copy_config_to_buf("CONFIG_KSU_SUSFS_SUS_MAP\n", buf_ptr, &copied_size, bufsize);
-	if (err) goto out_kfree_kbuf;
-	buf_ptr = kbuf + copied_size;
-#endif
-#ifdef CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT
-	err = copy_config_to_buf("CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT\n", buf_ptr, &copied_size, bufsize);
 	if (err) goto out_kfree_kbuf;
 	buf_ptr = kbuf + copied_size;
 #endif
