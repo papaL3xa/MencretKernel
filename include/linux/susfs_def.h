@@ -41,6 +41,7 @@
 
 #define DEFAULT_KSU_MNT_ID 500000 /* used by mount->mnt_id */
 #define DEFAULT_KSU_MNT_GROUP_ID 5000 /* used by mount->mnt_group_id */
+#define DEFAULT_KSU_MNT_ID_FOR_KSU_PROC_UNSHARE 1000000 /* used by vfsmount->susfs_mnt_id_backup */
 
 /*
  * mount->mnt.susfs_mnt_id_backup => storing original mount's mnt_id
