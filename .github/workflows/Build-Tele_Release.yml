@@ -8,6 +8,9 @@ on:
         description: 'Release Version'
         required: true        
 
+env:
+  BUILD_KERNEL_VERSION: ${{ github.event.inputs.version }}
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -31,35 +34,36 @@ jobs:
           
       - name: Set environment variable
         run: |
-          SHA=$(git rev-parse --short ${{ github.sha }})
-          echo BUILD_DATE=$(date +'%Y%m%d') >> $GITHUB_ENV
-          echo COMMIT_SHA=$SHA >> $GITHUB_ENV
-          echo "BUILD_KERNEL_VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          SHA=$(git rev-parse --short $GITHUB_SHA)
+          echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
+          echo "COMMIT_SHA=$SHA" >> $GITHUB_ENV
           
       - name: Building Kernel
         run: |
-            bash build.sh ${{ matrix.device }}
+          bash build.sh ${{ matrix.device }}
 
       - name: Upload kernel
         uses: actions/upload-artifact@v4
         with:
           name: "MencretKernel-${{ env.BUILD_KERNEL_VERSION }}-${{ env.BUILD_DATE }}-${{ matrix.device }}-stock-One-UI"
-          path: |
-            build/*.tar
+          path: "build/*.tar"
+          if-no-files-found: error
 
   telegram-notification:
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      BUILD_KERNEL_VERSION: ${{ github.event.inputs.version }}
+      BUILD_DATE: ${{ needs.build.outputs.build_date }}
 
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
+      - name: Set build date
+        run: |
+          echo "BUILD_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
 
-      - name: Upload to Telegram Group (Pre-Release Announcement)
+      - name: Upload to Telegram Group
         uses: appleboy/telegram-action@master
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -67,34 +71,38 @@ jobs:
           format: html
           disable_web_page_preview: false
           message: |
-            🚀 <h1><b>MencretKernel ${{ github.event.inputs.version }} - Build Completed!</b></h1>
-            
-            📱 <b>Supported Devices:</b>
-            • d1, d2s, d1x, d2x (Note10 Series)
-            • beyond2, beyond1, beyond0, beyondxks (S10 Series)
-            
-            ⚙️ <b>Build Details:</b>
-            • Kernel Name: MencretKernel
-            • Version: ${{ github.event.inputs.version }}
-            • KernelSU: yes
-            • Build Date: ${{ env.BUILD_DATE }}
-            
-            📦 <b>Status:</b> Preparing GitHub Release...
-            
-            🔗 <b>Release will be available soon at:</b>
-            <a href=https://github.com/${{ github.repository }}/releases>HERE</a>
-            
+            🚀 <b>MencretKernel ${{ env.BUILD_KERNEL_VERSION }} - Build Completed!</b>
+
+            📱 <b>Supported Devices:</b> 
+            - Note10 Series: 
+              - d1, 
+              - d1xks, 
+              - d2s, 
+              - d2x
+            - S10 Series: 
+              - beyond0lte,
+              - beyond1lte, 
+              - beyond2lte, 
+              - beyondx
+
+            📦 <b>Build Details:</b>
+            ⚙️ <b>Version:</b> ${{ env.BUILD_KERNEL_VERSION }}
+            📅 <b>Build Date:</b> ${{ env.BUILD_DATE }}
+            ☠️ <b>Commit:</b> ${{ github.sha }}
+
             💬 <b>For Discussion:</b>
-            https://t.me/PapaL3xaKernel/2            
+            https://t.me/PapaL3xaKernel/2
+
+            🔗 <b>Release:</b> <a href="https://github.com/${{ github.repository }}/releases">GitHub</a>
 
             <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">MencretKernel</a>
-            
-            <b>Commit SHA:</b> <a href="https://github.com/${{ github.repository }}/commit/${{github.sha}}">Click here</a>
-            
+
+            <b>Commit SHA:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">Click here</a>
+
             <b>Installation Guide:</b> <a href="https://telegra.ph/MencretKernel-Installation-Guide-10-03">Click here</a>
 
   release:
-    needs: [build, telegram-notification]
+    needs: build  # Hanya perlu build, tidak perlu telegram-notification
     runs-on: ubuntu-latest
     permissions:
       contents: write    
@@ -105,31 +113,54 @@ jobs:
         with:
           path: artifacts
 
-      - name: Create Release Kernel
+      - name: Set Release Token
+        id: set-token
+        run: |
+          if [ -n "${{ github.event.inputs.token }}" ] && [ "${{ github.event.inputs.token }}" != "" ]; then
+            echo "RELEASE_TOKEN=${{ github.event.inputs.token }}" >> $GITHUB_ENV
+          else
+            echo "RELEASE_TOKEN=${{ github.token }}" >> $GITHUB_ENV
+          fi
+
+      - name: Release Build Kernel
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ github.event.inputs.version }}
-          name: "MencretKernel-${{ github.event.inputs.version }}-${{ env.BUILD_DATE }}-stock-One-UI"
+          name: "MencretKernel-${{ github.event.inputs.version }}-Stock OneUI4.X"
           draft: false
           prerelease: false
-          token: ${{ secrets.TOKEN }}          
+          generateReleaseNotes: true
+          makeLatest: true
+          skipIfReleaseExists: false
+          token: ${{ secrets.GITHUB_TOKEN }}  # Gunakan GITHUB_TOKEN default
+          removeArtifacts: true
           artifacts: "artifacts/**/*.tar"
-          body: "Commit SHA: ${{ github.sha }}"
+          body: |
+            # 🚀 MencretKernel ${{ env.BUILD_KERNEL_VERSION }} - Build Completed!
+            
+            # 📱 Supported Devices: 
+            - Note10 Series: 
+              - d1, 
+              - d1xks, 
+              - d2s, 
+              - d2x
+            - S10 Series: 
+              - beyond0lte,
+              - beyond1lte, 
+              - beyond2lte, 
+              - beyondx
 
-      - name: Upload to Telegram Group (Release Confirmation)
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          format: html
-          disable_web_page_preview: false
-          message: |
-            ✅ <h1><b>MencretKernel ${{ github.event.inputs.version }} Successfully Released!</b></h1>
-            
-            📥 <b>Download Now:</b>
-            <a href="https://github.com/${{ github.repository }}/releases/tag/${{ github.event.inputs.version }}">DOWNLOAD FROM GITHUB</a>
-            
-            🎉 <b>Release is now live and available for download!</b>
-            
-            ❤️ THANK YOU ❤️
-            🪶Built by <b><a href="https://github.com/${{ github.repository }}">PapaL3xa</a></b>🪶
+            # 📦 Build Details:
+            ⚙️ <b>Version:</b> ${{ env.BUILD_KERNEL_VERSION }}
+            📅 <b>Build Date:</b> ${{ env.BUILD_DATE }}
+            ☠️ <b>Commit:</b> ${{ github.sha }}
+
+            # 💬 For Discussion:
+            https://t.me/PapaL3xaKernel/2
+
+            # 🔗 Release:</b> <a href="https://github.com/${{ github.repository }}/releases">GitHub</a>
+            #  Installation Guide: <a href="https://telegra.ph/MencretKernel-Installation-Guide-10-03">Click here</a>
+
+            <b>Repository:</b> <a href="https://github.com/${{ github.repository }}">MencretKernel</a>
+
+            <b>Commit SHA:</b> <a href="https://github.com/${{ github.repository }}/commit/${{ github.sha }}">Click here</a>
