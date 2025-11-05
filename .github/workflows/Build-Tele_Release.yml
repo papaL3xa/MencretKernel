@@ -71,7 +71,7 @@ jobs:
           format: html
           disable_web_page_preview: false
           message: |
-            🚀 <b>MencretKernel ${{ env.BUILD_KERNEL_VERSION }} - Build Completed!</b>
+            🚀 <b>MencretKernel ${{ env.BUILD_KERNEL_VERSION }} For ONEUI4.X - Build Completed!</b>
 
             📱 <b>Supported Devices:</b> 
             - Note10 Series: 
@@ -136,7 +136,7 @@ jobs:
           removeArtifacts: true
           artifacts: "artifacts/**/*.tar"
           body: |
-            # 🚀 MencretKernel ${{ env.BUILD_KERNEL_VERSION }} - Build Completed!
+            # 🚀 MencretKernel ${{ env.BUILD_KERNEL_VERSION }} For ONEUI4.X - Build Completed!
             
             # 📱 Supported Devices: 
             - Note10 Series: 
